@@ -1,12 +1,24 @@
 services:
   - type: web
     name: yeulin-numbertoinfo
-    runtime: python
-    region: singapore
+    runtime: node
+    region: oregon
     plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    buildCommand: "pnpm install --no-frozen-lockfile && pnpm --filter @workspace/api-spec exec orval --config ./orval.config.ts && BASE_PATH=/ PORT=3000 pnpm --filter @workspace/key-manager run build && pnpm --filter @workspace/api-server run build"
+    startCommand: "node artifacts/api-server/dist/index.mjs"
     envVars:
-      - key: PORT
-        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: yeulin-numbertoinfo-db
+          property: connectionString
 
+databases:
+  - name: yeulin-numbertoinfo-db
+    databaseName: yeulindb
+    plan: free
+    region: oregon
+    version: "16"
