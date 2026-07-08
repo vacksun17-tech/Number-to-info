@@ -1,0 +1,314 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: keys
+    description: API key management operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /keys:
+    get:
+      operationId: listKeys
+      tags: [keys]
+      summary: List all API keys
+      description: Returns all API keys (active and revoked)
+      responses:
+        "200":
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKey"
+    post:
+      operationId: createKey
+      tags: [keys]
+      summary: Create a new API key
+      description: Creates a new API key with optional expiry and owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyInput"
+      responses:
+        "201":
+          description: Created API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyCreated"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /keys/stats:
+    get:
+      operationId: getKeyStats
+      tags: [keys]
+      summary: Get key statistics
+      description: Returns summary counts of active, revoked, and expired keys
+      responses:
+        "200":
+          description: Key statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeyStats"
+
+  /keys/{id}:
+    get:
+      operationId: getKey
+      tags: [keys]
+      summary: Get a single API key
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: API key details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+        "404":
+          description: Key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteKey
+      tags: [keys]
+      summary: Delete an API key permanently
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Key deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /keys/{id}/revoke:
+    post:
+      operationId: revokeKey
+      tags: [keys]
+      summary: Revoke an API key
+      description: Marks an API key as revoked, preventing its use
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Key revoked successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+        "404":
+          description: Key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /keys/{id}/restore:
+    post:
+      operationId: restoreKey
+      tags: [keys]
+      summary: Restore a revoked API key
+      description: Re-activates a previously revoked API key
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Key restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+        "404":
+          description: Key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ApiKey:
+      type: object
+      required:
+        - id
+        - name
+        - prefix
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Unique identifier (UUID)
+        name:
+          type: string
+          description: Key name — also the actual key value used in ?key=NAME
+        ownerId:
+          type: ["string", "null"]
+          description: Owner identifier
+        prefix:
+          type: string
+          description: Same as name (used for display compatibility)
+        status:
+          type: string
+          enum: [active, revoked, expired]
+          description: Current key status
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    ApiKeyCreated:
+      type: object
+      required:
+        - id
+        - name
+        - prefix
+        - status
+        - createdAt
+        - key
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ownerId:
+          type: ["string", "null"]
+        prefix:
+          type: string
+        status:
+          type: string
+          enum: [active, revoked, expired]
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: ["string", "null"]
+          format: date-time
+        key:
+          type: string
+          description: The key value (same as name)
+
+    ApiKeyInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Key name — this becomes the key value used in ?key=NAME
+        ownerId:
+          type: string
+          description: Owner identifier
+        expiresInDays:
+          type: ["integer", "null"]
+          minimum: 1
+          description: Number of days until expiry (null = never expires)
+
+    KeyStats:
+      type: object
+      required:
+        - total
+        - active
+        - revoked
+        - expired
+      properties:
+        total:
+          type: integer
+        active:
+          type: integer
+        revoked:
+          type: integer
+        expired:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
